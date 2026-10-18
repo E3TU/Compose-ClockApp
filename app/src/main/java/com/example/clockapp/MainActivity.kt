@@ -1,32 +1,225 @@
 package com.example.clockapp
 
+import android.app.UiModeManager
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.clockapp.ui.theme.AppearanceMode
 import com.example.clockapp.ui.theme.ClockAppTheme
+import com.example.clockapp.ui.theme.ColorSource
+import com.example.clockapp.ui.theme.ThemeSettings
+import com.example.clockapp.ui.theme.setAppearanceMode
+import com.example.clockapp.ui.theme.setColorSource
+import com.example.clockapp.ui.theme.themeSettings
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ClockAppTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+            val activity = this
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            val settings by context.themeSettings
+                .collectAsStateWithLifecycle(initialValue = ThemeSettings())
+
+            ClockAppTheme(colorSource = settings.colorSource) {
+                ClockAppRoot(
+                    settings = settings,
+                    onColorSourceChange = { source ->
+                        scope.launch { context.setColorSource(source) }
+                    },
+                    onAppearanceChange = { mode ->
+                        scope.launch {
+                            context.setAppearanceMode(mode)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                val nightMode = when (mode) {
+                                    AppearanceMode.SYSTEM -> UiModeManager.MODE_NIGHT_AUTO
+                                    AppearanceMode.LIGHT -> UiModeManager.MODE_NIGHT_NO
+                                    AppearanceMode.DARK -> UiModeManager.MODE_NIGHT_YES
+                                }
+                                val uiModeManager =
+                                    activity.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+                                uiModeManager.setApplicationNightMode(nightMode)
+                                activity.recreate()
+                            }
+                        }
+                    }
+                )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ClockAppRoot(
+    settings: ThemeSettings,
+    onColorSourceChange: (ColorSource) -> Unit,
+    onAppearanceChange: (AppearanceMode) -> Unit
+) {
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("Clock") },
+                actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_settings),
+                            contentDescription = "Theme settings"
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Greeting(
+            name = "Android",
+            modifier = Modifier
+                .padding(innerPadding)
+                .padding(16.dp)
+        )
+
+        if (showSettings) {
+            ThemeSettingsSheet(
+                settings = settings,
+                onColorSourceChange = onColorSourceChange,
+                onAppearanceChange = onAppearanceChange,
+                onDismiss = { showSettings = false }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeSettingsSheet(
+    settings: ThemeSettings,
+    onColorSourceChange: (ColorSource) -> Unit,
+    onAppearanceChange: (AppearanceMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text("Color palette", style = MaterialTheme.typography.titleMedium)
+            RadioRow(
+                label = "Brand sunrise",
+                selected = settings.colorSource == ColorSource.BRAND,
+                onSelect = { onColorSourceChange(ColorSource.BRAND) }
+            )
+            RadioRow(
+                label = "Material You",
+                enabled = supportsDynamicColor,
+                selected = settings.colorSource == ColorSource.DYNAMIC && supportsDynamicColor,
+                onSelect = { onColorSourceChange(ColorSource.DYNAMIC) }
+            )
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+
+            Text("Appearance", style = MaterialTheme.typography.titleMedium)
+            RadioRow(
+                label = "System default",
+                selected = settings.appearanceMode == AppearanceMode.SYSTEM,
+                onSelect = { onAppearanceChange(AppearanceMode.SYSTEM) }
+            )
+            if (supportsDynamicColor) {
+                RadioRow(
+                    label = "Light",
+                    selected = settings.appearanceMode == AppearanceMode.LIGHT,
+                    onSelect = { onAppearanceChange(AppearanceMode.LIGHT) }
+                )
+                RadioRow(
+                    label = "Dark",
+                    selected = settings.appearanceMode == AppearanceMode.DARK,
+                    onSelect = { onAppearanceChange(AppearanceMode.DARK) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioRow(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onSelect
+            )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
     }
 }
 
@@ -40,8 +233,24 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
-    ClockAppTheme {
-        Greeting("Android")
+fun GreetingPreviewLight() {
+    ClockAppTheme(colorSource = ColorSource.BRAND) {
+        Scaffold(
+            topBar = { Text("Clock", modifier = Modifier.padding(16.dp)) }
+        ) { padding ->
+            Greeting("Android", Modifier.padding(padding))
+        }
+    }
+}
+
+@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun GreetingPreviewDark() {
+    ClockAppTheme(colorSource = ColorSource.BRAND) {
+        Scaffold(
+            topBar = { Text("Clock", modifier = Modifier.padding(16.dp)) }
+        ) { padding ->
+            Greeting("Android", Modifier.padding(padding))
+        }
     }
 }
