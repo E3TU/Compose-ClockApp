@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">ClockApp</string>
+    <string name="nav_alarm">Alarm</string>
+    <string name="nav_clock">Clock</string>
+    <string name="nav_timer">Timer</string>
+    <string name="nav_stopwatch">Stopwatch</string>
 </resources>

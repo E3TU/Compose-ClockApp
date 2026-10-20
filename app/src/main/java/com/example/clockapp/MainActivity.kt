@@ -23,6 +23,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -38,10 +40,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.clockapp.navigation.TopLevelDestination
+import com.example.clockapp.ui.screens.AlarmScreen
+import com.example.clockapp.ui.screens.ClockScreen
+import com.example.clockapp.ui.screens.StopwatchScreen
+import com.example.clockapp.ui.screens.TimerScreen
 import com.example.clockapp.ui.theme.AppearanceMode
 import com.example.clockapp.ui.theme.ClockAppTheme
 import com.example.clockapp.ui.theme.ColorSource
@@ -97,13 +110,17 @@ fun ClockAppRoot(
     onColorSourceChange: (ColorSource) -> Unit,
     onAppearanceChange: (AppearanceMode) -> Unit
 ) {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val currentDestination = TopLevelDestination.fromRoute(currentRoute)
     var showSettings by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Clock") },
+                title = { Text(stringResource(currentDestination.labelRes)) },
                 actions = {
                     IconButton(onClick = { showSettings = true }) {
                         Icon(
@@ -113,14 +130,54 @@ fun ClockAppRoot(
                     }
                 }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                TopLevelDestination.entries.forEach { destination ->
+                    val selected = currentDestination == destination
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = {
+                            if (!selected) {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },
+                        icon = {
+                            Icon(
+                                painter = painterResource(destination.iconRes),
+                                contentDescription = stringResource(destination.labelRes)
+                            )
+                        },
+                        label = { Text(stringResource(destination.labelRes)) }
+                    )
+                }
+            }
         }
     ) { innerPadding ->
-        Greeting(
-            name = "Android",
-            modifier = Modifier
-                .padding(innerPadding)
-                .padding(16.dp)
-        )
+        NavHost(
+            navController = navController,
+            startDestination = TopLevelDestination.START.route,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(TopLevelDestination.CLOCK.route) {
+                ClockScreen()
+            }
+            composable(TopLevelDestination.ALARM.route) {
+                AlarmScreen()
+            }
+            composable(TopLevelDestination.TIMER.route) {
+                TimerScreen()
+            }
+            composable(TopLevelDestination.STOPWATCH.route) {
+                StopwatchScreen()
+            }
+        }
 
         if (showSettings) {
             ThemeSettingsSheet(
@@ -223,34 +280,18 @@ private fun RadioRow(
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreviewLight() {
+fun ClockAppPreviewLight() {
     ClockAppTheme(colorSource = ColorSource.BRAND) {
-        Scaffold(
-            topBar = { Text("Clock", modifier = Modifier.padding(16.dp)) }
-        ) { padding ->
-            Greeting("Android", Modifier.padding(padding))
-        }
+        ClockScreen()
     }
 }
 
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun GreetingPreviewDark() {
+fun ClockAppPreviewDark() {
     ClockAppTheme(colorSource = ColorSource.BRAND) {
-        Scaffold(
-            topBar = { Text("Clock", modifier = Modifier.padding(16.dp)) }
-        ) { padding ->
-            Greeting("Android", Modifier.padding(padding))
-        }
+        ClockScreen()
     }
 }
