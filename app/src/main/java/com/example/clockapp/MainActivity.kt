@@ -1,13 +1,17 @@
 package com.example.clockapp
 
 import android.app.UiModeManager
+import android.text.format.DateFormat
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,6 +55,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.clockapp.navigation.TopLevelDestination
+import com.example.clockapp.ui.resolveIs24Hour
 import com.example.clockapp.ui.screens.AlarmScreen
 import com.example.clockapp.ui.screens.ClockScreen
 import com.example.clockapp.ui.screens.StopwatchScreen
@@ -59,8 +64,10 @@ import com.example.clockapp.ui.theme.AppearanceMode
 import com.example.clockapp.ui.theme.ClockAppTheme
 import com.example.clockapp.ui.theme.ColorSource
 import com.example.clockapp.ui.theme.ThemeSettings
+import com.example.clockapp.ui.theme.TimeFormatMode
 import com.example.clockapp.ui.theme.setAppearanceMode
 import com.example.clockapp.ui.theme.setColorSource
+import com.example.clockapp.ui.theme.setTimeFormat
 import com.example.clockapp.ui.theme.themeSettings
 import kotlinx.coroutines.launch
 
@@ -96,6 +103,9 @@ class MainActivity : ComponentActivity() {
                                 activity.recreate()
                             }
                         }
+                    },
+                    onTimeFormatChange = { format ->
+                        scope.launch { context.setTimeFormat(format) }
                     }
                 )
             }
@@ -103,13 +113,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClockAppRoot(
     settings: ThemeSettings,
     onColorSourceChange: (ColorSource) -> Unit,
-    onAppearanceChange: (AppearanceMode) -> Unit
+    onAppearanceChange: (AppearanceMode) -> Unit,
+    onTimeFormatChange: (TimeFormatMode) -> Unit
 ) {
+    val context = LocalContext.current
+    val is24Hour = resolveIs24Hour(context, settings.timeFormat)
+    val systemIs24Hour = DateFormat.is24HourFormat(context)
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -166,10 +181,10 @@ fun ClockAppRoot(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(TopLevelDestination.CLOCK.route) {
-                ClockScreen()
+                ClockScreen(is24Hour = is24Hour)
             }
             composable(TopLevelDestination.ALARM.route) {
-                AlarmScreen()
+                AlarmScreen(is24Hour = is24Hour)
             }
             composable(TopLevelDestination.TIMER.route) {
                 TimerScreen()
@@ -182,8 +197,10 @@ fun ClockAppRoot(
         if (showSettings) {
             ThemeSettingsSheet(
                 settings = settings,
+                systemIs24Hour = systemIs24Hour,
                 onColorSourceChange = onColorSourceChange,
                 onAppearanceChange = onAppearanceChange,
+                onTimeFormatChange = onTimeFormatChange,
                 onDismiss = { showSettings = false }
             )
         }
@@ -194,17 +211,20 @@ fun ClockAppRoot(
 @Composable
 private fun ThemeSettingsSheet(
     settings: ThemeSettings,
+    systemIs24Hour: Boolean,
     onColorSourceChange: (ColorSource) -> Unit,
     onAppearanceChange: (AppearanceMode) -> Unit,
+    onTimeFormatChange: (TimeFormatMode) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -244,6 +264,27 @@ private fun ThemeSettingsSheet(
                     onSelect = { onAppearanceChange(AppearanceMode.DARK) }
                 )
             }
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+
+            Text("Time format", style = MaterialTheme.typography.titleMedium)
+            RadioRow(
+                label = "System default (${if (systemIs24Hour) "24-hour" else "12-hour"})",
+                selected = settings.timeFormat == TimeFormatMode.SYSTEM,
+                onSelect = { onTimeFormatChange(TimeFormatMode.SYSTEM) }
+            )
+            RadioRow(
+                label = "12-hour",
+                selected = settings.timeFormat == TimeFormatMode.H12,
+                onSelect = { onTimeFormatChange(TimeFormatMode.H12) }
+            )
+            RadioRow(
+                label = "24-hour",
+                selected = settings.timeFormat == TimeFormatMode.H24,
+                onSelect = { onTimeFormatChange(TimeFormatMode.H24) }
+            )
         }
     }
 }
@@ -280,6 +321,7 @@ private fun RadioRow(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun ClockAppPreviewLight() {
@@ -288,6 +330,7 @@ fun ClockAppPreviewLight() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun ClockAppPreviewDark() {
