@@ -72,6 +72,7 @@ import com.example.clockapp.ui.theme.themeSettings
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -98,7 +99,7 @@ class MainActivity : ComponentActivity() {
                                     AppearanceMode.DARK -> UiModeManager.MODE_NIGHT_YES
                                 }
                                 val uiModeManager =
-                                    activity.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+                                    activity.getSystemService(UI_MODE_SERVICE) as UiModeManager
                                 uiModeManager.setApplicationNightMode(nightMode)
                                 activity.recreate()
                             }
