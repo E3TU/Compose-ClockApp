@@ -20,24 +20,30 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+import com.example.clockapp.data.AlertNotifications
 import com.example.clockapp.data.AlarmScheduler
+import com.example.clockapp.data.TimerReceiver
+import com.example.clockapp.data.TimerScheduler
 import com.example.clockapp.ui.formatClockTime
 import com.example.clockapp.ui.resolveIs24Hour
 import com.example.clockapp.ui.theme.ClockAppTheme
+import com.example.clockapp.ui.theme.ThemeSettings
 import com.example.clockapp.ui.theme.themeSettings
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
 import java.util.Calendar
 
-class AlarmActivity : ComponentActivity() {
+class AlertActivity : ComponentActivity() {
 
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
@@ -58,18 +64,41 @@ class AlarmActivity : ComponentActivity() {
                 android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
 
-        val label = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_LABEL)
-            ?.takeIf { it.isNotBlank() } ?: "Alarm"
+        val alertType = intent.getStringExtra(EXTRA_ALERT_TYPE) ?: TYPE_ALARM
+        val label = intent.getStringExtra(EXTRA_LABEL)?.takeIf { it.isNotBlank() }
+            ?: if (alertType == TYPE_TIMER) "Timer" else "Alarm"
+        val alertId = intent.getLongExtra(EXTRA_ALERT_ID, -1L)
+
         setContent {
             val settings by themeSettings
-                .collectAsStateWithLifecycle(
-                    initialValue = com.example.clockapp.ui.theme.ThemeSettings()
-                )
+                .collectAsStateWithLifecycle(initialValue = ThemeSettings())
             ClockAppTheme(colorSource = settings.colorSource) {
-                AlarmRingingScreen(
+                AlertRingingScreen(
                     label = label,
                     is24Hour = resolveIs24Hour(this, settings.timeFormat),
-                    onDismiss = { finish() }
+                    isTimer = alertType == TYPE_TIMER,
+                    onDismiss = {
+                        if (alertType == TYPE_TIMER && alertId >= 0) {
+                            sendBroadcast(
+                                Intent(this, TimerReceiver::class.java).apply {
+                                    action = TimerReceiver.ACTION_DISMISS
+                                    putExtra(TimerScheduler.EXTRA_TIMER_ID, alertId)
+                                }
+                            )
+                        }
+                        finish()
+                    },
+                    onAddMinute = {
+                        if (alertId >= 0) {
+                            sendBroadcast(
+                                Intent(this, TimerReceiver::class.java).apply {
+                                    action = TimerReceiver.ACTION_ADD_MINUTE
+                                    putExtra(TimerScheduler.EXTRA_TIMER_ID, alertId)
+                                }
+                            )
+                        }
+                        finish()
+                    }
                 )
             }
         }
@@ -96,7 +125,7 @@ class AlarmActivity : ComponentActivity() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
-                setDataSource(this@AlarmActivity, uri)
+                setDataSource(this@AlertActivity, uri)
                 isLooping = true
                 prepare()
                 start()
@@ -131,11 +160,40 @@ class AlarmActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_DISMISS = "com.example.clockapp.action.DISMISS_RINGING"
+        const val EXTRA_ALERT_TYPE = "alert_type"
+        const val EXTRA_ALERT_ID = "alert_id"
+        const val EXTRA_LABEL = "alert_label"
+        const val TYPE_ALARM = "alarm"
+        const val TYPE_TIMER = "timer"
+
+        fun alarmIntent(context: Context, alarmId: Long, label: String): Intent =
+            Intent(context, AlertActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra(EXTRA_ALERT_TYPE, TYPE_ALARM)
+                putExtra(EXTRA_ALERT_ID, alarmId)
+                putExtra(AlarmScheduler.EXTRA_ALARM_LABEL, label)
+                putExtra(EXTRA_LABEL, label)
+            }
+
+        fun timerIntent(context: Context, timerId: Long, label: String): Intent =
+            Intent(context, AlertActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra(EXTRA_ALERT_TYPE, TYPE_TIMER)
+                putExtra(EXTRA_ALERT_ID, timerId)
+                putExtra(TimerScheduler.EXTRA_TIMER_LABEL, label)
+                putExtra(EXTRA_LABEL, label)
+            }
     }
 }
 
 @Composable
-fun AlarmRingingScreen(label: String, is24Hour: Boolean, onDismiss: () -> Unit) {
+fun AlertRingingScreen(
+    label: String,
+    is24Hour: Boolean,
+    isTimer: Boolean,
+    onDismiss: () -> Unit,
+    onAddMinute: () -> Unit = {}
+) {
     val now = Calendar.getInstance()
     val time = formatClockTime(
         now.get(Calendar.HOUR_OF_DAY),
@@ -157,8 +215,20 @@ fun AlarmRingingScreen(label: String, is24Hour: Boolean, onDismiss: () -> Unit) 
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(48.dp))
-        Button(onClick = onDismiss, modifier = Modifier.height(56.dp)) {
-            Text("Dismiss", style = MaterialTheme.typography.titleMedium)
+        if (isTimer) {
+            Button(onClick = onDismiss, modifier = Modifier.height(56.dp)) {
+                Text("Dismiss", style = MaterialTheme.typography.titleMedium)
+            }
+            TextButton(
+                onClick = onAddMinute,
+                modifier = Modifier.padding(top = 12.dp)
+            ) {
+                Text("Add 1 minute", style = MaterialTheme.typography.titleMedium)
+            }
+        } else {
+            Button(onClick = onDismiss, modifier = Modifier.height(56.dp)) {
+                Text("Dismiss", style = MaterialTheme.typography.titleMedium)
+            }
         }
     }
 }

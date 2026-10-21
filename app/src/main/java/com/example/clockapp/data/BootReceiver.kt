@@ -17,6 +17,7 @@ class BootReceiver : BroadcastReceiver() {
             try {
                 val alarms = AppDatabase.get(appContext).alarmDao().getAll()
                 AlarmScheduler.rescheduleAll(appContext, alarms)
+                TimerRepository(appContext).rescheduleAll()
             } finally {
                 pending.finish()
             }

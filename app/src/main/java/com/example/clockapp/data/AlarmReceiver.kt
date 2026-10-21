@@ -1,18 +1,14 @@
 package com.example.clockapp.data
 
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.example.clockapp.AlarmActivity
+import com.example.clockapp.AlertActivity
 import com.example.clockapp.MainActivity
 import com.example.clockapp.R
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +23,7 @@ class AlarmReceiver : BroadcastReceiver() {
         if (intent.action == ACTION_DISMISS) {
             NotificationManagerCompat.from(context).cancel(alarmId.toInt())
             // Tell the ringing activity to stop its looping sound/vibration.
-            context.sendBroadcast(Intent(AlarmActivity.ACTION_DISMISS))
+            context.sendBroadcast(Intent(AlertActivity.ACTION_DISMISS))
             return
         }
 
@@ -53,7 +49,11 @@ class AlarmReceiver : BroadcastReceiver() {
 
     @SuppressLint("WrongConstant", "FullScreenIntentPolicy")
     private fun showNotification(context: Context, alarmId: Long, label: String) {
-        ensureChannel(context)
+        AlertNotifications.ensureChannel(
+            context,
+            AlertNotifications.CHANNEL_ALARMS,
+            "Alarms"
+        )
 
         val fullLabel = label.ifBlank { "Alarm" }
 
@@ -81,15 +81,14 @@ class AlarmReceiver : BroadcastReceiver() {
         val fullScreenIntent = PendingIntent.getActivity(
             context,
             alarmId.toInt() + 200_000,
-            Intent(context, AlarmActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
-                putExtra(AlarmScheduler.EXTRA_ALARM_LABEL, fullLabel)
-            },
+            AlertActivity.alarmIntent(context, alarmId, fullLabel),
             flags
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(
+            context,
+            AlertNotifications.CHANNEL_ALARMS
+        )
             .setSmallIcon(R.drawable.ic_alarm)
             .setContentTitle(fullLabel)
             .setContentText(context.getString(R.string.alarm_fire_time))
@@ -114,33 +113,5 @@ class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_DISMISS = "com.example.clockapp.action.DISMISS_ALARM"
-        private const val CHANNEL_ID = "alarms"
-
-        private fun ensureChannel(context: Context) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-            val manager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Alarms",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                if (soundUri != null) {
-                    setSound(
-                        soundUri,
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                }
-                vibrationPattern = longArrayOf(0, 600, 800)
-                enableVibration(true)
-            }
-            manager.createNotificationChannel(channel)
-        }
     }
 }

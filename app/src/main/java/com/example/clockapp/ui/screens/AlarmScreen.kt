@@ -1,11 +1,7 @@
 package com.example.clockapp.ui.screens
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockapp.data.Alarm
 import com.example.clockapp.data.AlarmRepository
 import com.example.clockapp.data.Days
+import com.example.clockapp.ui.ExactAlarmBanner
+import com.example.clockapp.ui.canScheduleExactAlarms
 import com.example.clockapp.ui.formatClockTime
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -170,30 +168,6 @@ fun AlarmScreen(modifier: Modifier = Modifier, is24Hour: Boolean = true) {
                 editingAlarm = null
             }
         )
-    }
-}
-
-@Composable
-private fun ExactAlarmBanner(context: Context) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Alarms will not fire until exact alarm permission is granted.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(Modifier.width(8.dp))
-            TextButton(onClick = { context.requestExactAlarmSettings() }) {
-                Text("Allow")
-            }
-        }
     }
 }
 
@@ -357,21 +331,5 @@ private fun AlarmTimePickerDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
-}
-
-private fun Context.canScheduleExactAlarms(): Boolean {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
-    val manager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-    return manager.canScheduleExactAlarms()
-}
-
-private fun Context.requestExactAlarmSettings() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-    startActivity(
-        Intent(
-            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-            Uri.fromParts("package", packageName, null)
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     )
 }

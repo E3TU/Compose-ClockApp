@@ -31,7 +31,7 @@
         </activity>
 
         <activity
-            android:name=".AlarmActivity"
+            android:name=".AlertActivity"
             android:exported="false"
             android:launchMode="singleInstance"
             android:showWhenLocked="true"
@@ -39,6 +39,10 @@
 
         <receiver
             android:name=".data.AlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.TimerReceiver"
             android:exported="false" />
 
         <receiver
