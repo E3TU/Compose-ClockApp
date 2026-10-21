@@ -1,5 +1,6 @@
 package com.example.clockapp.data
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -50,15 +51,14 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
+    @SuppressLint("WrongConstant", "FullScreenIntentPolicy")
     private fun showNotification(context: Context, alarmId: Long, label: String) {
         ensureChannel(context)
 
-        val fullLabel = if (label.isBlank()) "Alarm" else label
+        val fullLabel = label.ifBlank { "Alarm" }
 
         var flags = PendingIntent.FLAG_UPDATE_CURRENT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags = flags or PendingIntent.FLAG_IMMUTABLE
-        }
+        flags = flags or PendingIntent.FLAG_IMMUTABLE
         val openIntent = PendingIntent.getActivity(
             context,
             alarmId.toInt(),

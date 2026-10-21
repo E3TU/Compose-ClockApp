@@ -60,9 +60,7 @@ object AlarmScheduler {
             putExtra(EXTRA_ALARM_LABEL, label)
         }
         var flags = PendingIntent.FLAG_UPDATE_CURRENT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags = flags or PendingIntent.FLAG_IMMUTABLE
-        }
+        flags = flags or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getBroadcast(context, alarmId.toInt(), intent, flags)
     }
 
