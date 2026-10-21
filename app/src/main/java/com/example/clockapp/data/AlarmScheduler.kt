@@ -79,7 +79,6 @@ object AlarmScheduler {
             for (offset in 0..7) {
                 val candidate = trigger.clone() as Calendar
                 candidate.add(Calendar.DAY_OF_YEAR, offset)
-                // Calendar.DAY_OF_WEEK: Sunday = 1 .. Saturday = 7 -> map to Monday = 0 .. Sunday = 6
                 val dayIndex = (candidate.get(Calendar.DAY_OF_WEEK) + 5) % 7
                 if (alarm.repeatsOn(dayIndex) && candidate.after(now)) {
                     return candidate.timeInMillis
