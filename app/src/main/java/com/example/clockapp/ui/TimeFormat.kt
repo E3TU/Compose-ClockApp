@@ -53,3 +53,21 @@ fun formatDuration(millis: Long): String {
         "%02d:%02d".format(minutes, seconds)
     }
 }
+
+/** MM:SS.cc under an hour, H:MM:SS at or over. */
+fun formatStopwatch(millis: Long): String {
+    val clamped = millis.coerceAtLeast(0)
+    val hours = clamped / 3_600_000
+    val minutes = (clamped % 3_600_000) / 60_000
+    val seconds = (clamped % 60_000) / 1000
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        val centis = (clamped % 1000) / 10
+        "%02d:%02d.%02d".format(minutes, seconds, centis)
+    }
+}
+
+/** Per-lap splits from cumulative lap totals. */
+fun lapSplits(totals: List<Long>): List<Long> =
+    totals.mapIndexed { index, total -> total - (totals.getOrNull(index - 1) ?: 0) }
