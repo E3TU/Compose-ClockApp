@@ -4,6 +4,7 @@
     <string name="nav_clock">Clock</string>
     <string name="nav_timer">Timer</string>
     <string name="nav_stopwatch">Stopwatch</string>
+    <string name="nav_settings">Settings</string>
     <string name="alarm_dismiss">Dismiss</string>
     <string name="alarm_fire_time">Time to wake up</string>
     <string name="timer_fire_time">Time is up</string>

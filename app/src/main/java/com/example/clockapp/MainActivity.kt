@@ -9,45 +9,35 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -58,6 +48,8 @@ import com.example.clockapp.navigation.TopLevelDestination
 import com.example.clockapp.ui.resolveIs24Hour
 import com.example.clockapp.ui.screens.AlarmScreen
 import com.example.clockapp.ui.screens.ClockScreen
+import com.example.clockapp.ui.screens.SETTINGS_ROUTE
+import com.example.clockapp.ui.screens.SettingsScreen
 import com.example.clockapp.ui.screens.StopwatchScreen
 import com.example.clockapp.ui.screens.TimerScreen
 import com.example.clockapp.ui.theme.AppearanceMode
@@ -130,48 +122,73 @@ fun ClockAppRoot(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val currentDestination = TopLevelDestination.fromRoute(currentRoute)
-    var showSettings by rememberSaveable { mutableStateOf(false) }
+    val isSettingsRoute = currentRoute == SETTINGS_ROUTE
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(currentDestination.labelRes)) },
-                actions = {
-                    IconButton(onClick = { showSettings = true }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_settings),
-                            contentDescription = "Theme settings"
-                        )
-                    }
+            Crossfade(targetState = isSettingsRoute, label = "topBar") { showSettingsBar ->
+                if (showSettingsBar) {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.nav_settings)) },
+                        navigationIcon = {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_arrow_back),
+                                    contentDescription = "Back"
+                                )
+                            }
+                        }
+                    )
+                } else {
+                    TopAppBar(
+                        title = { Text(stringResource(currentDestination.labelRes)) },
+                        actions = {
+                            IconButton(onClick = { navController.navigate(SETTINGS_ROUTE) }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_settings),
+                                    contentDescription = "Theme settings"
+                                )
+                            }
+                        }
+                    )
                 }
-            )
+            }
         },
         bottomBar = {
-            NavigationBar {
-                TopLevelDestination.entries.forEach { destination ->
-                    val selected = currentDestination == destination
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = {
-                            if (!selected) {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+            AnimatedVisibility(
+                visible = !isSettingsRoute,
+                enter = slideInVertically(tween(250, easing = LinearOutSlowInEasing)) { it } +
+                    fadeIn(tween(200)),
+                exit = slideOutVertically(tween(250, easing = FastOutLinearInEasing)) { it } +
+                    fadeOut(tween(200)),
+                label = "bottomBar"
+            ) {
+                NavigationBar {
+                    TopLevelDestination.entries.forEach { destination ->
+                        val selected = currentDestination == destination
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                if (!selected) {
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                painter = painterResource(destination.iconRes),
-                                contentDescription = stringResource(destination.labelRes)
-                            )
-                        },
-                        label = { Text(stringResource(destination.labelRes)) }
-                    )
+                            },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(destination.iconRes),
+                                    contentDescription = stringResource(destination.labelRes)
+                                )
+                            },
+                            label = { Text(stringResource(destination.labelRes)) }
+                        )
+                    }
                 }
             }
         }
@@ -179,7 +196,35 @@ fun ClockAppRoot(
         NavHost(
             navController = navController,
             startDestination = TopLevelDestination.START.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = {
+                if (targetState.destination.route == SETTINGS_ROUTE) {
+                    slideInHorizontally(tween(350, easing = LinearOutSlowInEasing)) { it / 4 } +
+                        fadeIn(tween(250, delayMillis = 90))
+                } else {
+                    fadeIn(tween(200))
+                }
+            },
+            exitTransition = {
+                if (targetState.destination.route == SETTINGS_ROUTE) {
+                    slideOutHorizontally(tween(350, easing = FastOutLinearInEasing)) { -it / 5 } +
+                        fadeOut(tween(200))
+                } else {
+                    fadeOut(tween(200))
+                }
+            },
+            popEnterTransition = {
+                slideInHorizontally(tween(350, easing = LinearOutSlowInEasing)) { -it / 5 } +
+                    fadeIn(tween(250, delayMillis = 90))
+            },
+            popExitTransition = {
+                if (targetState.destination.route == SETTINGS_ROUTE) {
+                    slideOutHorizontally(tween(350, easing = FastOutLinearInEasing)) { it / 4 } +
+                        fadeOut(tween(200))
+                } else {
+                    fadeOut(tween(200))
+                }
+            }
         ) {
             composable(TopLevelDestination.CLOCK.route) {
                 ClockScreen(is24Hour = is24Hour)
@@ -193,132 +238,16 @@ fun ClockAppRoot(
             composable(TopLevelDestination.STOPWATCH.route) {
                 StopwatchScreen()
             }
-        }
-
-        if (showSettings) {
-            ThemeSettingsSheet(
-                settings = settings,
-                systemIs24Hour = systemIs24Hour,
-                onColorSourceChange = onColorSourceChange,
-                onAppearanceChange = onAppearanceChange,
-                onTimeFormatChange = onTimeFormatChange,
-                onDismiss = { showSettings = false }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ThemeSettingsSheet(
-    settings: ThemeSettings,
-    systemIs24Hour: Boolean,
-    onColorSourceChange: (ColorSource) -> Unit,
-    onAppearanceChange: (AppearanceMode) -> Unit,
-    onTimeFormatChange: (TimeFormatMode) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text("Color palette", style = MaterialTheme.typography.titleMedium)
-            RadioRow(
-                label = "Brand sunrise",
-                selected = settings.colorSource == ColorSource.BRAND,
-                onSelect = { onColorSourceChange(ColorSource.BRAND) }
-            )
-            RadioRow(
-                label = "Material You",
-                enabled = supportsDynamicColor,
-                selected = settings.colorSource == ColorSource.DYNAMIC && supportsDynamicColor,
-                onSelect = { onColorSourceChange(ColorSource.DYNAMIC) }
-            )
-
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
-
-            Text("Appearance", style = MaterialTheme.typography.titleMedium)
-            RadioRow(
-                label = "System default",
-                selected = settings.appearanceMode == AppearanceMode.SYSTEM,
-                onSelect = { onAppearanceChange(AppearanceMode.SYSTEM) }
-            )
-            if (supportsDynamicColor) {
-                RadioRow(
-                    label = "Light",
-                    selected = settings.appearanceMode == AppearanceMode.LIGHT,
-                    onSelect = { onAppearanceChange(AppearanceMode.LIGHT) }
-                )
-                RadioRow(
-                    label = "Dark",
-                    selected = settings.appearanceMode == AppearanceMode.DARK,
-                    onSelect = { onAppearanceChange(AppearanceMode.DARK) }
+            composable(SETTINGS_ROUTE) {
+                SettingsScreen(
+                    settings = settings,
+                    systemIs24Hour = systemIs24Hour,
+                    onColorSourceChange = onColorSourceChange,
+                    onAppearanceChange = onAppearanceChange,
+                    onTimeFormatChange = onTimeFormatChange
                 )
             }
-
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
-
-            Text("Time format", style = MaterialTheme.typography.titleMedium)
-            RadioRow(
-                label = "System default (${if (systemIs24Hour) "24-hour" else "12-hour"})",
-                selected = settings.timeFormat == TimeFormatMode.SYSTEM,
-                onSelect = { onTimeFormatChange(TimeFormatMode.SYSTEM) }
-            )
-            RadioRow(
-                label = "12-hour",
-                selected = settings.timeFormat == TimeFormatMode.H12,
-                onSelect = { onTimeFormatChange(TimeFormatMode.H12) }
-            )
-            RadioRow(
-                label = "24-hour",
-                selected = settings.timeFormat == TimeFormatMode.H24,
-                onSelect = { onTimeFormatChange(TimeFormatMode.H24) }
-            )
         }
-    }
-}
-
-@Composable
-private fun RadioRow(
-    label: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    enabled: Boolean = true
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onSelect
-            )
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
-        )
     }
 }
 
